@@ -41,42 +41,60 @@ def generate_random_input(rows, cols, num_seqs):
 
     return buffer_size, matrix, sequences, points
 
-def manual_input():
-    buffer_size = int(input("Enter buffer size: "))
-    rows, cols = map(int, input("Enter matrix size (rows cols): ").split())
-    matrix = [list(input().split()) for _ in range(rows)]
-    
-    num_seqs = int(input("Enter the number of sequences: "))
-    sequences = [input().strip().split() for _ in range(num_seqs)]
-    points = [int(input()) for _ in range(num_seqs)]
+def find_all_patterns(
+    matrix: list[list[str]], step: int
+) -> list[list[tuple[str, tuple[int, int]]]]:
+    num_rows: int = len(matrix)
+    num_cols: int = len(matrix[0])
+    all_paths: list[list[tuple[str, tuple[int, int]]]] = []
 
-    return buffer_size, matrix, sequences, points
+    def explore_paths(
+        current_x: int,
+        current_y: int,
+        current_path: list[tuple[str, tuple[int, int]]] = [],
+        visited_cells: set[tuple[int, int]] = set(),
+        current_direction: str = "vertical",
+        remaining_steps: int = step,
+    ) -> None:
+        if remaining_steps == 0:
+            all_paths.append(current_path.copy())
+            return
+        if current_direction == "vertical":
+            for next_y in range(num_rows):
+                if (current_x, next_y) not in visited_cells: 
+                    explore_paths(
+                        current_x,
+                        next_y,
+                        current_path + [
+                            (matrix[next_y][current_x], (current_x, next_y))
+                        ],  
+                        visited_cells | {(current_x, next_y)}, 
+                        "horizontal",
+                        remaining_steps - 1,
+                    )
+        else: 
+            for next_x in range(num_cols):
+                if (next_x, current_y) not in visited_cells: 
+                    explore_paths(
+                        next_x,
+                        current_y,
+                        current_path + [
+                            (matrix[current_y][next_x], (next_x, current_y))
+                        ],  
+                        visited_cells | {(next_x, current_y)},  
+                        "vertical",
+                        remaining_steps - 1,
+                    )
 
-def find_all_patterns(matrix, step):
-    rows, cols = len(matrix), len(matrix[0])
-    all_paths = []
-
-    for indices in itertools.product(range(cols), range(rows)):
-        x, y = indices
-        path = []
-        visited = []
-
-        def generate_paths(x, y, steps):
-            if steps == 0:
-                all_paths.append(path.copy())
-                return
-            visited.append((x, y))
-            path.append((matrix[y][x], (x, y)))
-
-            for dx, dy in [(0, 1), (1, 0)]:
-                next_x, next_y = x + dx, y + dy
-                if 0 <= next_x < cols and 0 <= next_y < rows and (next_x, next_y) not in visited:
-                    generate_paths(next_x, next_y, steps - 1)
-
-            visited.pop()
-            path.pop()
-
-        generate_paths(x, y, step)
+    for x in range(num_cols):
+        explore_paths(
+            x,
+            0,
+            current_path=[(matrix[0][x], (x, 0))],
+            visited_cells={(x, 0)},
+            current_direction="vertical",
+            remaining_steps=step,
+        )
 
     return all_paths
 
@@ -91,18 +109,47 @@ def calculate_point(matrix, path, sequences, points):
                 buffer_tokens = [t for t in buffer_tokens if t not in seq]
     return total_reward
 
-def optimal_pattern(matrix, buffer_size, sequences, points):
-    max_points = float('-inf')
-    optimal_path = []
+def compare_path_with_sequence(
+    path: list[tuple[str, tuple[int, int]]], sequence: list[str],
+) -> bool:
+    for i in range(0, len(path)-len(sequence)+1):
+        if all(path[i+j][0] == sequence[j] for j in range(len(sequence))):
+            return True
+    return False
 
-    all_paths = find_all_patterns(matrix, buffer_size)
+def point_path(path: list[tuple[str, tuple[int, int]]], rewards: list[int], sequences: list[list[str]]) -> int:
+    for i in range(len(sequences)):
+        if compare_path_with_sequence(path, sequences[i]):
+            return rewards[i]
+    return 0
+
+def compare_paths(
+    all_paths: list[list[tuple[str, tuple[int, int]]]],
+    sequences: list[list[str]],
+    rewards: list[int],
+) -> tuple[list[list[tuple[str, tuple[int, int]]]], int]:
+    result = []
+    total_points = 0
+    current_points = 0
     for path in all_paths:
-        path_reward = calculate_point(matrix, path, sequences, points)
-        if path_reward > max_points:
-            max_points = path_reward
-            optimal_path = path
+        for i in range(len(sequences)):
+            if compare_path_with_sequence(path, sequences[i]):
+                current_points += rewards[i]
+        if not result:
+            result = path
+            total_points = current_points
+        else:
+            if current_points > total_points:
+                result = path
+                total_points = current_points
+        current_points = 0
 
-    return max_points, optimal_path
+    return result, total_points
+
+def optimal_pattern(matrix, buffer_size, sequences, points):
+    all_paths = find_all_patterns(matrix, buffer_size)
+    optimal_path, max_points = compare_paths(all_paths, sequences, points)
+    return max_points, optimal_path[:-1]
 
 def save_results(max_points, optimal_path, final_time):
     filename = input("Enter the filename to save the results: ")
