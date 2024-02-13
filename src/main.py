@@ -25,7 +25,7 @@ def generate_random_input(rows, cols, num_seqs):
     
     sequences = [[''.join(chr(random.randint(65, 90)) for _ in range(random.randint(1, 5)))] for _ in range(num_seqs)]
 
-    points = [random.randint(1, 10) for _ in range(num_seqs)]
+    points = [random.randint(10, 100) for _ in range(num_seqs)]
 
     print("Randomly Generated Input:")
     print(f"Buffer Size: {buffer_size}")
@@ -226,6 +226,7 @@ def main():
         rows = int(input("Enter the number of rows: "))
         cols = int(input("Enter the number of columns: "))
         num_seqs = int(input("Enter the number of sequences: "))
+        loader()
         print_ascii_result()
         buffer_size, matrix, sequences, points = generate_random_input(rows, cols, num_seqs)
     elif choice == '3':
